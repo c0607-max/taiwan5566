@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星際太空艙 - 訂便當與飲料系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 圖標 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Orbitron -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Three.js (用於3D旋轉星空) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #03001e;
+            overflow-x: hidden;
+        }
+        .orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* 客製化滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(168, 85, 247, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(168, 85, 247, 0.8);
+        }
+        /* 玻璃擬態效果 */
+        .glass-card {
+            background: rgba(15, 12, 41, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* 霓虹邊框發光 */
+        .neon-glow-purple {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+        }
+        .neon-glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+        /* 3D背景固定 */
+        #starfield-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+        /* 漸變文字 */
+        .gradient-text {
+            background: linear-gradient(135deg, #a855f7 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+
+    <!-- 3D星空背景 Canvas -->
+    <canvas id="starfield-canvas"></canvas>
+
+    <!-- 導航列 -->
+    <header class="glass-card sticky top-0 z-50 px-4 py-3 border-b border-white/10 shadow-lg">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center animate-spin" style="animation-duration: 15s;">
+                    <i class="fa-solid fa-space-shuttle text-white text-lg rotate-[-45deg]"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wider orbitron gradient-text">GALACTIC ORDER</h1>
+                    <p class="text-xs text-slate-400">星際太空便當 & 飲料觀星點餐系統</p>
+                </div>
+            </div>
+            
+            <!-- 分頁導航按鈕 -->
+            <nav class="flex flex-wrap gap-2 justify-center">
+                <button onclick="switchTab('tab-order')" id="btn-tab-order" class="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white shadow-lg shadow-purple-500/20">
+                    <i class="fa-solid fa-rocket"></i> 點餐太空艙
+                </button>
+                <button onclick="switchTab('tab-cart')" id="btn-tab-cart" class="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-white/5 text-slate-300 hover:bg-white/10">
+                    <i class="fa-solid fa-cart-shopping"></i> 星際訂單 <span id="cart-badge" class="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+                </button>
+                <button onclick="switchTab('tab-lottery')" id="btn-tab-lottery" class="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-white/5 text-slate-300 hover:bg-white/10">
+                    <i class="fa-solid fa-dice-d20"></i> 星際抽籤機
+                </button>
+                <button onclick="switchTab('tab-settings')" id="btn-tab-settings" class="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-white/5 text-slate-300 hover:bg-white/10">
+                    <i class="fa-solid fa-sliders"></i> 控制中心
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6">
+        
+        <!-- ==================== 1. 點餐分頁 ==================== -->
+        <section id="tab-order" class="tab-content space-y-6">
+            <!-- 快速簡介 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card p-4 rounded-2xl flex items-center gap-4 neon-glow-purple">
+                    <div class="p-3 bg-purple-500/20 rounded-xl text-purple-400">
+                        <i class="fa-solid fa-utensils text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-200">太空飽腹便當</h3>
+                        <p class="text-xs text-slate-400" id="bento-count-display">載入中...</p>
+                    </div>
+                </div>
+                <div class="glass-card p-4 rounded-2xl flex items-center gap-4 neon-glow-cyan">
+                    <div class="p-3 bg-cyan-500/20 rounded-xl text-cyan-400">
+                        <i class="fa-solid fa-glass-water text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-200">超星系特調飲料</h3>
+                        <p class="text-xs text-slate-400" id="drink-count-display">載入中...</p>
+                    </div>
+                </div>
+                <div class="glass-card p-4 rounded-2xl flex items-center gap-4 border-cyan-500/20">
+                    <div class="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
+                        <i class="fa-solid fa-user-astronaut text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-200">當前訂購統計</h3>
+                        <p class="text-xs text-slate-400" id="order-quick-stat">0 人已登機點餐</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 便當與飲料菜單 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- 便當區 -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2 text-purple-400 orbitron">
+                        <i class="fa-solid fa-box-archive"></i> BENTO CABIN / 便當選單
+                    </h2>
+                    <div id="bento-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
+                        <!-- 動態生成便當卡片 -->
+                    </div>
+                </div>
+
+                <!-- 飲料區 -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-bold flex items-center gap-2 text-cyan-400 orbitron">
+                        <i class="fa-solid fa-wine-glass"></i> NEBULA DRINKS / 飲料選單
+                    </h2>
+                    <div id="drink-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2">
+                        <!-- 動態生成飲料卡片 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 2. 訂單購物車分頁 ==================== -->
+        <section id="tab-cart" class="tab-content hidden space-y-6">
+            <div class="glass-card rounded-3xl p-6 neon-glow-purple">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-white/10">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center gap-2 gradient-text orbitron">
+                            <i class="fa-solid fa-receipt"></i> MISSION MANIFEST / 訂單明細
+                        </h2>
+                        <p class="text-slate-400 text-sm mt-1">匯整所有探險隊員的點餐明細與總金額</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="copyManifestText()" class="px-4 py-2 bg-purple-600/80 hover:bg-purple-600 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
+                            <i class="fa-solid fa-copy"></i> 複製訂單文字 (LINE群組)
+                        </button>
+                        <button onclick="clearAllOrders()" class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 border border-rose-500/30 rounded-xl text-sm font-semibold flex items-center gap-2 text-rose-300 transition-all">
+                            <i class="fa-solid fa-trash-can"></i> 清除所有訂單
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 訂單統計快報 -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div class="text-slate-400 text-xs">總便當數量</div>
+                        <div class="text-2xl font-bold orbitron text-purple-300 mt-1" id="stat-total-bento">0</div>
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div class="text-slate-400 text-xs">總飲料數量</div>
+                        <div class="text-2xl font-bold orbitron text-cyan-300 mt-1" id="stat-total-drink">0</div>
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div class="text-slate-400 text-xs">應付總金額</div>
+                        <div class="text-2xl font-bold orbitron text-emerald-400 mt-1" id="stat-total-price">$0</div>
+                    </div>
+                </div>
+
+                <!-- 訂單列表 -->
+                <div class="overflow-x-auto rounded-xl">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-white/5 text-slate-300 text-sm uppercase orbitron border-b border-white/10">
+                                <th class="p-4">點餐人</th>
+                                <th class="p-4">類型</th>
+                                <th class="p-4">品項</th>
+                                <th class="p-4">規格</th>
+                                <th class="p-4">數量</th>
+                                <th class="p-4 text-right">金額</th>
+                                <th class="p-4 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-table-body" class="divide-y divide-white/5 text-sm">
+                            <!-- 動態生成訂單資料 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="cart-empty-state" class="text-center py-12 hidden">
+                    <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-ghost text-3xl text-slate-500"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-300">目前沒有訂單</h3>
+                    <p class="text-slate-500 text-sm mt-1">快去「點餐太空艙」挑選美味的便當與飲料吧！</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 3. 抽籤分頁 ==================== -->
+        <section id="tab-lottery" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- 抽籤名單與設定 -->
+                <div class="glass-card rounded-2xl p-6 space-y-4">
+                    <h3 class="text-lg font-bold flex items-center gap-2 text-purple-400 orbitron">
+                        <i class="fa-solid fa-user-tag"></i> LOTTERY ROSTER / 抽籤名單
+                    </h3>
+                    <p class="text-xs text-slate-400">在這裡輸入參與抽籤的人員名字（一列一個名字），或者直接引用目前有點餐的名單！</p>
+                    
+                    <div>
+                        <textarea id="lottery-names-input" rows="8" class="w-full bg-slate-900/80 border border-white/10 rounded-xl p-3 text-slate-200 text-sm focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500" placeholder="王小明&#10;李小華&#10;張大同"></textarea>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button onclick="syncNamesFromOrders()" class="flex-1 py-2 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all">
+                            <i class="fa-solid fa-sync"></i> 載入目前點餐名單
+                        </button>
+                        <button onclick="saveLotteryNames()" class="flex-1 py-2 px-3 bg-purple-600/80 hover:bg-purple-600 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all">
+                            <i class="fa-solid fa-floppy-disk"></i> 儲存名單
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 抽籤互動區 -->
+                <div class="lg:col-span-2 glass-card rounded-2xl p-6 flex flex-col justify-between neon-glow-cyan min-h-[400px]">
+                    <div class="text-center space-y-2">
+                        <h2 class="text-2xl font-bold gradient-text orbitron tracking-wider">星際命運輪盤</h2>
+                        <p class="text-slate-400 text-sm">點擊按鈕，由星塵引力選出今天的重要角色！</p>
+                    </div>
+
+                    <!-- 抽籤視覺展示框 -->
+                    <div class="my-8 flex flex-col items-center justify-center">
+                        <div class="relative w-64 h-64 md:w-80 md:h-80 rounded-full bg-gradient-to-tr from-purple-900/30 via-slate-900/50 to-cyan-900/30 flex items-center justify-center border-2 border-dashed border-cyan-500/40 shadow-inner overflow-hidden">
+                            <!-- 動態裝飾光暈 -->
+                            <div class="absolute inset-4 rounded-full border border-white/5 animate-pulse"></div>
+                            <div class="absolute inset-8 rounded-full bg-cyan-500/5 blur-xl"></div>
+                            
+                            <!-- 顯示區域 -->
+                            <div id="lottery-display" class="text-center z-10 px-6 transition-all duration-150">
+                                <span class="text-4xl text-cyan-400 font-bold tracking-widest block filter drop-shadow-[0_0_10px_rgba(6,182,212,0.6)] orbitron" id="winner-name">READY</span>
+                                <span class="text-xs text-slate-500 uppercase mt-2 block" id="lottery-subtext">等待發射...</span>
+                            </div>
+
+                            <!-- 外環旋轉點點 -->
+                            <div class="absolute inset-0 border border-transparent border-t-purple-500 rounded-full animate-spin" style="animation-duration: 3s;"></div>
+                            <div class="absolute inset-2 border border-transparent border-b-cyan-400 rounded-full animate-spin" style="animation-duration: 4s; animation-direction: reverse;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 抽籤按鈕 -->
+                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button onclick="startLottery('who')" id="btn-draw-who" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl font-bold flex items-center justify-center gap-2 tracking-wide transition-all shadow-lg shadow-purple-600/30">
+                            <i class="fa-solid fa-user-astronaut"></i> 抽出「幸運兒」
+                        </button>
+                        <button onclick="startLottery('drink')" id="btn-draw-drink" class="px-6 py-3 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 rounded-xl font-bold flex items-center justify-center gap-2 tracking-wide transition-all shadow-lg shadow-cyan-600/30">
+                            <i class="fa-solid fa-glass-water"></i> 抽出「隨機飲品」
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== 4. 控制中心 (設定) ==================== -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+            <div class="glass-card rounded-2xl p-6 space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center gap-2 text-cyan-400 orbitron">
+                        <i class="fa-solid fa-gears"></i> SYSTEM CONTROL PANEL / 匯入與設定
+                    </h2>
+                    <p class="text-slate-400 text-sm mt-1">自訂您的太空食堂，輸入您喜好的便當、飲料選項</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 匯入便當設定 -->
+                    <div class="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                        <h3 class="font-semibold text-purple-300 flex items-center gap-2 text-sm md:text-base">
+                            <i class="fa-solid fa-file-import"></i> 批次匯入便當項目
+                        </h3>
+                        <p class="text-xs text-slate-400">格式：品項名稱, 價格（一列一個，支援空格或逗號分隔）</p>
+                        <textarea id="import-bento-input" rows="8" class="w-full bg-slate-900/80 border border-white/10 rounded-xl p-3 text-slate-200 text-xs md:text-sm font-mono focus:outline-none focus:border-purple-500" placeholder="厚切排骨飯 110&#10;酥炸雞腿飯,120&#10;特選招牌飯 100&#10;星際蔬食餐 95"></textarea>
+                    </div>
+
+                    <!-- 匯入飲料設定 -->
+                    <div class="space-y-3 bg-white/5 p-4 rounded-xl border border-white/5">
+                        <h3 class="font-semibold text-cyan-300 flex items-center gap-2 text-sm md:text-base">
+                            <i class="fa-solid fa-file-import"></i> 批次匯入飲料項目
+                        </h3>
+                        <p class="text-xs text-slate-400">格式：品項名稱, 價格（一列一個，支援空格或逗號分隔）</p>
+                        <textarea id="import-drink-input" rows="8" class="w-full bg-slate-900/80 border border-white/10 rounded-xl p-3 text-slate-200 text-xs md:text-sm font-mono focus:outline-none focus:border-cyan-500" placeholder="太空珍珠奶茶 60&#10;仙女紅茶,35&#10;超星系四季春 40&#10;流星百香雙Q 65"></textarea>
+                    </div>
+                </div>
+
+                <!-- 按鈕控制 -->
+                <div class="flex flex-wrap gap-3 justify-end pt-4 border-t border-white/10">
+                    <button onclick="restoreDefaultMenus()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all">
+                        <i class="fa-solid fa-rotate-left"></i> 回復預設選單
+                    </button>
+                    <button onclick="saveImportedMenus()" class="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-cyan-600/20">
+                        <i class="fa-solid fa-check"></i> 儲存並應用選單
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== 5. 點餐彈出視窗 (Modal) ==================== -->
+    <div id="order-modal" class="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="glass-card w-full max-w-md rounded-2xl p-6 space-y-4 border border-white/20 transform scale-95 transition-transform duration-300" id="order-modal-content">
+            
+            <!-- 視窗標題 -->
+            <div class="flex justify-between items-center pb-2 border-b border-white/10">
+                <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2" id="modal-item-title">
+                    <i class="fa-solid fa-cart-plus text-purple-400"></i> 加到我的星際艙
+                </h3>
+                <button onclick="closeOrderModal()" class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- 品項說明 -->
+            <div class="flex justify-between items-center bg-white/5 p-3 rounded-xl">
+                <span id="modal-item-name" class="font-bold text-slate-200">品項名稱</span>
+                <span id="modal-item-price" class="text-cyan-400 font-bold orbitron">$0</span>
+            </div>
+
+            <!-- 客製化欄位 -->
+            <div class="space-y-4 pt-2">
+                <!-- 訂購人姓名 -->
+                <div class="space-y-1.5">
+                    <label class="text-xs text-slate-400 block font-semibold">登機探險隊員姓名 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="order-name" class="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500" placeholder="請輸入姓名">
+                </div>
+
+                <!-- 飲料專屬選項 (甜度、冰塊、加料) -->
+                <div id="drink-custom-options" class="space-y-3 hidden">
+                    <!-- 甜度 -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs text-slate-400 block font-semibold">甜度 (Sugar Level)</label>
+                        <div class="grid grid-cols-4 gap-1.5 text-xs text-center">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="sugar" value="正常甜" checked class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">正常</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="sugar" value="少糖" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">少糖</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="sugar" value="半糖" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">半糖</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="sugar" value="無糖" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">微/無糖</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 冰塊 -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs text-slate-400 block font-semibold">冰塊 (Ice Level)</label>
+                        <div class="grid grid-cols-4 gap-1.5 text-xs text-center">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="ice" value="正常冰" checked class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">正常冰</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="ice" value="少冰" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">少冰</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="ice" value="去冰" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">去冰</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="ice" value="溫熱" class="sr-only peer">
+                                <div class="p-2 rounded-lg bg-white/5 border border-white/5 peer-checked:bg-cyan-500/20 peer-checked:border-cyan-500/50 peer-checked:text-cyan-300">熱飲</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 數量控制 -->
+                <div class="flex justify-between items-center pt-2">
+                    <span class="text-xs text-slate-400 font-semibold">數量 (Quantity)</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeModalQuantity(-1)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-all">-</button>
+                        <span id="modal-qty" class="w-10 text-center font-bold text-slate-100 orbitron">1</span>
+                        <button onclick="changeModalQuantity(1)" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-slate-300 transition-all">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 錯誤訊息提示 -->
+            <div id="modal-error" class="text-rose-400 text-xs hidden">請務必填寫您的姓名！</div>
+
+            <!-- 動作按鈕 -->
+            <button onclick="confirmOrder()" class="w-full py-3 mt-2 bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-500/20">
+                🚀 裝載到購物艙 ($<span id="modal-calc-total">0</span>)
+            </button>
+        </div>
+    </div>
+
+    <!-- 頁尾 -->
+    <footer class="glass-card mt-auto py-6 px-4 text-center border-t border-white/5 text-slate-500 text-xs">
+        <p>© 2026 Galactic Order Inc. 搭載 Three.js 的宇宙微重力訂單系統。願源力與您的味蕾同在。</p>
+    </footer>
+
+    <script>
+        // ==================== 狀態與常數設定 ====================
+        const DEFAULT_BENTOS = [
+            { id: 'b1', name: '經典厚切炸排骨便當', price: 110 },
+            { id: 'b2', name: '金黃黃金脆皮雞腿飯', price: 120 },
+            { id: 'b3', name: '極星秘製雙醬焢肉飯', price: 105 },
+            { id: 'b4', name: '超星系雙拼烤肉便當', price: 130 },
+            { id: 'b5', name: '宇宙舒肥嫩雞胸便當', price: 115 },
+            { id: 'b6', name: '太空格林蔬食養生餐', price: 95 }
+        ];
+
+        const DEFAULT_DRINKS = [
+            { id: 'd1', name: '超星系珍珠鮮奶茶', price: 65 },
+            { id: 'd2', name: '仙女秘製冷泡紅茶', price: 35 },
+            { id: 'd3', name: '流星四季春青茶', price: 35 },
+            { id: 'd4', name: '極致白雲芝士奶蓋綠', price: 60 },
+            { id: 'd5', name: '百香雙Q果粒果茶', price: 60 },
+            { id: 'd6', name: '宇治金時紅豆抹茶', price: 70 }
+        ];
+
+        const DEFAULT_LOTTERY_NAMES = [
+            "阿波羅", "尼爾阿姆斯壯", "尤里加加林", "馬斯克", "絕地武士", "尤達大師", "天行者", "莉亞公主"
+        ];
+
+        let state = {
+            bentos: [...DEFAULT_BENTOS],
+            drinks: [...DEFAULT_DRINKS],
+            lotteryNames: [...DEFAULT_LOTTERY_NAMES],
+            orders: [], // 儲存已點的訂單
+            currentModalItem: null, // 當前點擊要訂購的品項
+            modalQuantity: 1
+        };
+
+        // ==================== STREAMING_CHUNK:Three.js 3D 星空背景 ====================
+        function init3DStarfield() {
+            const canvas = document.getElementById('starfield-canvas');
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 150;
+
+            // 建立星星粒子
+            const starsCount = 1800;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(starsCount * 3);
+            const colors = new Float32Array(starsCount * 3);
+
+            for (let i = 0; i < starsCount * 3; i += 3) {
+                // 三維隨機分布
+                positions[i] = (Math.random() - 0.5) * 500;
+                positions[i + 1] = (Math.random() - 0.5) * 500;
+                positions[i + 2] = (Math.random() - 0.5) * 500;
+
+                // 顏色調配 (部分淡藍、部分淡紫、其餘白)
+                const rand = Math.random();
+                if (rand < 0.25) {
+                    colors[i] = 0.5; colors[i+1] = 0.7; colors[i+2] = 1.0; // 淡藍
+                } else if (rand < 0.5) {
+                    colors[i] = 0.8; colors[i+1] = 0.5; colors[i+2] = 1.0; // 淡紫
+                } else {
+                    colors[i] = 1.0; colors[i+1] = 1.0; colors[i+2] = 1.0; // 白色
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            // 創建材質
+            const material = new THREE.PointsMaterial({
+                size: 1.5,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85,
+                sizeAttenuation: true
+            });
+
+            const starField = new THREE.Points(geometry, material);
+            scene.add(starField);
+
+            // 滑鼠互動偏轉
+            let mouseX = 0, mouseY = 0;
+            window.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX - window.innerWidth / 2) * 0.05;
+                mouseY = (e.clientY - window.innerHeight / 2) * 0.05;
+            });
+
+            // 視窗大小改變自適應
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // 渲染動畫迴圈
+            function animate() {
+                requestAnimationFrame(animate);
+
+                // 緩慢旋轉星空
+                starField.rotation.y += 0.0008;
+                starField.rotation.x += 0.0003;
+
+                // 平滑追隨滑鼠視角
+                camera.position.x += (mouseX - camera.position.x) * 0.05;
+                camera.position.y += (-mouseY - camera.position.y) * 0.05;
+                camera.lookAt(scene.position);
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+        }
+
+        // ==================== STREAMING_CHUNK:Tab Switcher... ====================
+        function switchTab(tabId) {
+            // 隱藏所有 tab 內容
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            // 顯示當前選取的 tab
+            document.getElementById(tabId).classList.remove('hidden');
+
+            // 移除所有導航按鈕的選取樣式
+            const btnIds = ['btn-tab-order', 'btn-tab-cart', 'btn-tab-lottery', 'btn-tab-settings'];
+            btnIds.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.className = "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-white/5 text-slate-300 hover:bg-white/10";
+                }
+            });
+
+            // 為選取的按鈕加上極光漸變
+            const activeBtn = document.getElementById('btn-' + tabId);
+            if (activeBtn) {
+                activeBtn.className = "px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white shadow-lg shadow-purple-500/20";
+            }
+        }
+
+        // ==================== STREAMING_CHUNK:Local Storage Utilities... ====================
+        function loadDataFromStorage() {
+            const savedBentos = localStorage.getItem('galactic_bentos');
+            const savedDrinks = localStorage.getItem('galactic_drinks');
+            const savedLottery = localStorage.getItem('galactic_lottery');
+            const savedOrders = localStorage.getItem('galactic_orders');
+
+            if (savedBentos) state.bentos = JSON.parse(savedBentos);
+            if (savedDrinks) state.drinks = JSON.parse(savedDrinks);
+            if (savedLottery) state.lotteryNames = JSON.parse(savedLottery);
+            if (savedOrders) state.orders = JSON.parse(savedOrders);
+        }
+
+        function saveDataToStorage() {
+            localStorage.setItem('galactic_bentos', JSON.stringify(state.bentos));
+            localStorage.setItem('galactic_drinks', JSON.stringify(state.drinks));
+            localStorage.setItem('galactic_lottery', JSON.stringify(state.lotteryNames));
+            localStorage.setItem('galactic_orders', JSON.stringify(state.orders));
+        }
+
+        // ==================== STREAMING_CHUNK:Render menus... ====================
+        function renderMenus() {
+            const bentoContainer = document.getElementById('bento-container');
+            const drinkContainer = document.getElementById('drink-container');
+            
+            // 渲染便當
+            bentoContainer.innerHTML = '';
+            state.bentos.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "glass-card p-4 rounded-xl flex flex-col justify-between border border-purple-500/10 hover:border-purple-500/40 hover:shadow-[0_0_15px_rgba(168,85,247,0.2)] transition-all duration-300 group";
+                card.innerHTML = `
+                    <div class="space-y-1 mb-3">
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BENTO</span>
+                        <h4 class="font-bold text-slate-100 group-hover:text-purple-300 transition-colors mt-2 text-sm md:text-base">${item.name}</h4>
+                    </div>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="text-cyan-400 font-bold orbitron">$${item.price}</span>
+                        <button onclick="openOrderModal('${item.id}', 'bento')" class="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 rounded-lg text-xs font-semibold text-white flex items-center gap-1 transition-all">
+                            <i class="fa-solid fa-plus text-[10px]"></i> 加點太空餐
+                        </button>
+                    </div>
+                `;
+                bentoContainer.appendChild(card);
+            });
+
+            // 渲染飲料
+            drinkContainer.innerHTML = '';
+            state.drinks.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "glass-card p-4 rounded-xl flex flex-col justify-between border border-cyan-500/10 hover:border-cyan-500/40 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-300 group";
+                card.innerHTML = `
+                    <div class="space-y-1 mb-3">
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">DRINK</span>
+                        <h4 class="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors mt-2 text-sm md:text-base">${item.name}</h4>
+                    </div>
+                    <div class="flex justify-between items-center mt-auto">
+                        <span class="text-cyan-400 font-bold orbitron">$${item.price}</span>
+                        <button onclick="openOrderModal('${item.id}', 'drink')" class="px-3 py-1.5 bg-cyan-600/80 hover:bg-cyan-600 rounded-lg text-xs font-semibold text-white flex items-center gap-1 transition-all">
+                            <i class="fa-solid fa-plus text-[10px]"></i> 裝載特調
+                        </button>
+                    </div>
+                `;
+                drinkContainer.appendChild(card);
+            });
+
+            // 更新數量顯示
+            document.getElementById('bento-count-display').textContent = `共儲備 ${state.bentos.length} 款星系便當`;
+            document.getElementById('drink-count-display').textContent = `共調製 ${state.drinks.length} 款超光速飲品`;
+            
+            // 同步設定頁面的輸入框數值
+            document.getElementById('import-bento-input').value = state.bentos.map(b => `${b.name} ${b.price}`).join('\n');
+            document.getElementById('import-drink-input').value = state.drinks.map(d => `${d.name} ${d.price}`).join('\n');
+        }
+
+        // ==================== STREAMING_CHUNK:Cart & Orders operations... ====================
+        function updateOrderStats() {
+            const tableBody = document.getElementById('cart-table-body');
+            const emptyState = document.getElementById('cart-empty-state');
+            const cartBadge = document.getElementById('cart-badge');
+            
+            // 算數量
+            let totalBentoQty = 0;
+            let totalDrinkQty = 0;
+            let totalPrice = 0;
+
+            const uniqueNames = new Set();
+
+            tableBody.innerHTML = '';
+
+            if (state.orders.length === 0) {
+                emptyState.classList.remove('hidden');
+                cartBadge.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                cartBadge.classList.remove('hidden');
+                cartBadge.textContent = state.orders.reduce((acc, curr) => acc + curr.quantity, 0);
+
+                state.orders.forEach((order, index) => {
+                    uniqueNames.add(order.userName);
+                    if (order.type === 'bento') {
+                        totalBentoQty += order.quantity;
+                    } else {
+                        totalDrinkQty += order.quantity;
+                    }
+                    totalPrice += order.price * order.quantity;
+
+                    // 規格描述
+                    let specsText = "-";
+                    if (order.type === 'drink') {
+                        specsText = `<span class="bg-cyan-500/10 text-cyan-300 px-1.5 py-0.5 rounded text-xs">${order.sugar}</span> / <span class="bg-blue-500/10 text-blue-300 px-1.5 py-0.5 rounded text-xs">${order.ice}</span>`;
+                    } else {
+                        specsText = `<span class="bg-purple-500/10 text-purple-300 px-1.5 py-0.5 rounded text-xs">飽腹餐</span>`;
+                    }
+
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-white/5 transition-all";
+                    row.innerHTML = `
+                        <td class="p-4 font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-user-astronaut text-slate-400 text-xs"></i> ${order.userName}
+                        </td>
+                        <td class="p-4">
+                            <span class="${order.type === 'bento' ? 'text-purple-400' : 'text-cyan-400'} font-bold">
+                                ${order.type === 'bento' ? '便當' : '飲料'}
+                            </span>
+                        </td>
+                        <td class="p-4 font-semibold text-slate-100">${order.itemName}</td>
+                        <td class="p-4">${specsText}</td>
+                        <td class="p-4 font-bold orbitron text-slate-200">${order.quantity}</td>
+                        <td class="p-4 text-right font-bold text-cyan-400 orbitron">$${order.price * order.quantity}</td>
+                        <td class="p-4 text-center">
+                            <button onclick="deleteOrder(${index})" class="w-8 h-8 rounded-lg bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 hover:text-white transition-all flex items-center justify-center mx-auto" title="移除訂單">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // 更新首頁與訂單頁看板
+            document.getElementById('order-quick-stat').textContent = `${uniqueNames.size} 人已登機點餐`;
+            document.getElementById('stat-total-bento').textContent = totalBentoQty;
+            document.getElementById('stat-total-drink').textContent = totalDrinkQty;
+            document.getElementById('stat-total-price').textContent = `$${totalPrice}`;
+        }
+
+        // ==================== STREAMING_CHUNK:Order Modal Interactions... ====================
+        function openOrderModal(itemId, type) {
+            const item = type === 'bento' 
+                ? state.bentos.find(b => b.id === itemId)
+                : state.drinks.find(d => d.id === itemId);
+
+            if (!item) return;
+
+            state.currentModalItem = { ...item, type };
+            state.modalQuantity = 1;
+
+            // 設置Modal內容
+            document.getElementById('modal-item-name').textContent = item.name;
+            document.getElementById('modal-item-price').textContent = `$${item.price}`;
+            document.getElementById('modal-qty').textContent = '1';
+            document.getElementById('modal-calc-total').textContent = item.price;
+            document.getElementById('order-name').value = localStorage.getItem('last_user_name') || '';
+
+            // 判斷是否為飲料來決定顯示客製化選項
+            const drinkOptions = document.getElementById('drink-custom-options');
+            if (type === 'drink') {
+                drinkOptions.classList.remove('hidden');
+                document.getElementById('modal-item-title').innerHTML = `<i class="fa-solid fa-glass-water text-cyan-400"></i> 調製超星系特調`;
+            } else {
+                drinkOptions.classList.add('hidden');
+                document.getElementById('modal-item-title').innerHTML = `<i class="fa-solid fa-bowl-food text-purple-400"></i> 加載飽腹艙`;
+            }
+
+            document.getElementById('modal-error').classList.add('hidden');
+
+            // 顯示動畫
+            const modal = document.getElementById('order-modal');
+            const content = document.getElementById('order-modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeOrderModal() {
+            const modal = document.getElementById('order-modal');
+            const content = document.getElementById('order-modal-content');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function changeModalQuantity(amount) {
+            state.modalQuantity = Math.max(1, state.modalQuantity + amount);
+            document.getElementById('modal-qty').textContent = state.modalQuantity;
+            document.getElementById('modal-calc-total').textContent = state.currentModalItem.price * state.modalQuantity;
+        }
+
+        function confirmOrder() {
+            const nameInput = document.getElementById('order-name').value.trim();
+            if (!nameInput) {
+                document.getElementById('modal-error').classList.remove('hidden');
+                return;
+            }
+
+            // 紀錄最後一次點餐人，下次貼心自動帶入
+            localStorage.setItem('last_user_name', nameInput);
+
+            // 收集客製化資料
+            let orderDetails = {
+                userName: nameInput,
+                type: state.currentModalItem.type,
+                itemName: state.currentModalItem.name,
+                price: state.currentModalItem.price,
+                quantity: state.modalQuantity
+            };
+
+            if (state.currentModalItem.type === 'drink') {
+                const sugar = document.querySelector('input[name="sugar"]:checked').value;
+                const ice = document.querySelector('input[name="ice"]:checked').value;
+                orderDetails.sugar = sugar;
+                orderDetails.ice = ice;
+            }
+
+            state.orders.push(orderDetails);
+            saveDataToStorage();
+            updateOrderStats();
+            closeOrderModal();
+            
+            // 彈出成功小通知
+            showToast(`成功加載「${orderDetails.itemName}」至購物艙！`);
+        }
+
+        function deleteOrder(index) {
+            state.orders.splice(index, 1);
+            saveDataToStorage();
+            updateOrderStats();
+        }
+
+        function clearAllOrders() {
+            if (confirm("是否清空目前所有人的訂單明細？此動作無法復原喔！")) {
+                state.orders = [];
+                saveDataToStorage();
+                updateOrderStats();
+                showToast("訂單明細已完全淨空！");
+            }
+        }
+
+        // ==================== STREAMING_CHUNK:Clipboard manifest generator... ====================
+        function copyManifestText() {
+            if (state.orders.length === 0) {
+                showToast("目前沒有任何訂單可供匯出！", "error");
+                return;
+            }
+
+            // 彙整格式，格式如下：
+            // 🪐 星際大聚餐 🪐
+            // ==== 便當區 ====
+            // 1. 阿波羅: 經典厚切炸排骨便當 x 1 ($110)
+            // ==== 飲料區 ====
+            // 1. 尼爾: 珍珠鮮奶茶 (微糖/去冰) x 2 ($130)
+            // ================
+            // 💰 總金額: $240
+
+            let bentoText = "【🍱 便當區】\n";
+            let drinkText = "【🥤 飲料特調區】\n";
+            let bentoCount = 0;
+            let drinkCount = 0;
+            let totalPrice = 0;
+
+            state.orders.forEach(o => {
+                totalPrice += o.price * o.quantity;
+                if (o.type === 'bento') {
+                    bentoCount++;
+                    bentoText += `${bentoCount}. ${o.userName}: ${o.itemName} x ${o.quantity} ($${o.price * o.quantity})\n`;
+                } else {
+                    drinkCount++;
+                    drinkText += `${drinkCount}. ${o.userName}: ${o.itemName} (${o.sugar}/${o.ice}) x ${o.quantity} ($${o.price * o.quantity})\n`;
+                }
+            });
+
+            let fullText = `🪐 星際太空食堂 點單清單 🪐\n====================\n`;
+            if (bentoCount > 0) fullText += bentoText + "--------------------\n";
+            if (drinkCount > 0) fullText += drinkText + "--------------------\n";
+            fullText += `💰 登機人數總金額計: $${totalPrice} 元\n`;
+            fullText += `發射倒數！請確認以上明細。`;
+
+            // 使用安全降級複製方案
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = fullText;
+            tempTextArea.style.position = "absolute";
+            tempTextArea.style.left = "-9999px";
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showToast("📋 訂單明細已成功複製到剪貼簿！");
+                } else {
+                    showToast("複製失敗，請手動圈選複製。", "error");
+                }
+            } catch (err) {
+                showToast("複製失敗，瀏覽器不支援。", "error");
+            }
+            
+            document.body.removeChild(tempTextArea);
+        }
+
+        // ==================== STREAMING_CHUNK:Toast alert system... ====================
+        function showToast(message, type = "success") {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-5 right-5 z-[100] px-5 py-3 rounded-xl shadow-lg border backdrop-blur-md transition-all duration-300 transform translate-y-10 opacity-0 flex items-center gap-3`;
+            
+            if (type === "success") {
+                toast.className += " bg-purple-900/80 border-purple-500/40 text-purple-200 neon-glow-purple";
+                toast.innerHTML = `<i class="fa-solid fa-circle-check text-purple-400"></i> ${message}`;
+            } else {
+                toast.className += " bg-rose-900/80 border-rose-500/40 text-rose-200";
+                toast.innerHTML = `<i class="fa-solid fa-circle-exclamation text-rose-400"></i> ${message}`;
+            }
+
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
+        // ==================== STREAMING_CHUNK:Lottery Drawing Engine... ====================
+        let isDrawing = false;
+        
+        function initLotteryTab() {
+            // 從 state 載入抽籤名單
+            document.getElementById('lottery-names-input').value = state.lotteryNames.join('\n');
+        }
+
+        function saveLotteryNames() {
+            const input = document.getElementById('lottery-names-input').value.trim();
+            if (!input) {
+                showToast("抽籤名單不可為空！", "error");
+                return;
+            }
+            state.lotteryNames = input.split('\n').map(name => name.trim()).filter(name => name !== '');
+            saveDataToStorage();
+            showToast("抽籤名單已完成雲端同步！");
+        }
+
+        function syncNamesFromOrders() {
+            if (state.orders.length === 0) {
+                showToast("當前點餐名單為空，請先點餐！", "error");
+                return;
+            }
+            const namesSet = new Set(state.orders.map(o => o.userName));
+            state.lotteryNames = Array.from(namesSet);
+            document.getElementById('lottery-names-input').value = state.lotteryNames.join('\n');
+            saveDataToStorage();
+            showToast("成功從現有訂單中同步 " + state.lotteryNames.length + " 位探險員！");
+        }
+
+        function startLottery(mode) {
+            if (isDrawing) return;
+
+            // 確保有最新名單
+            saveLotteryNames();
+
+            let targetPool = [];
+            if (mode === 'who') {
+                targetPool = state.lotteryNames;
+                if (targetPool.length === 0) {
+                    showToast("沒有可用的人員抽籤名單，請先匯入！", "error");
+                    return;
+                }
+            } else {
+                targetPool = [...state.bentos.map(b => b.name), ...state.drinks.map(d => d.name)];
+                if (targetPool.length === 0) {
+                    showToast("無可用的餐點或飲品菜單！", "error");
+                    return;
+                }
+            }
+
+            isDrawing = true;
+            disableLotteryButtons(true);
+
+            const displayEl = document.getElementById('winner-name');
+            const subtextEl = document.getElementById('lottery-subtext');
+            
+            subtextEl.textContent = "星軌重力鎖定中...";
+            displayEl.classList.add('text-slate-400');
+
+            let speed = 50; // 初始閃爍速度
+            let counter = 0;
+            let timer;
+
+            // 動態跑馬燈模擬
+            function cycle() {
+                const tempIndex = Math.floor(Math.random() * targetPool.length);
+                displayEl.textContent = targetPool[tempIndex];
+
+                counter++;
+                // 模擬慢慢減速停下來的物理效果
+                if (counter < 25) {
+                    timer = setTimeout(cycle, speed);
+                } else if (counter < 35) {
+                    speed += 40;
+                    timer = setTimeout(cycle, speed);
+                } else if (counter < 42) {
+                    speed += 100;
+                    timer = setTimeout(cycle, speed);
+                } else {
+                    // 最終開獎
+                    const winnerIndex = Math.floor(Math.random() * targetPool.length);
+                    const winner = targetPool[winnerIndex];
+                    
+                    displayEl.textContent = winner;
+                    displayEl.classList.remove('text-slate-400');
+                    displayEl.classList.add('text-yellow-400', 'animate-bounce');
+                    
+                    subtextEl.innerHTML = mode === 'who' 
+                        ? `🎉 恭喜幸運星！就是你了！` 
+                        : `🌌 宇宙今天推薦您享用此品項！`;
+
+                    isDrawing = false;
+                    disableLotteryButtons(false);
+                    
+                    // 絢麗回饋
+                    setTimeout(() => {
+                        displayEl.classList.remove('animate-bounce');
+                    }, 1200);
+                }
+            }
+
+            cycle();
+        }
+
+        function disableLotteryButtons(disabled) {
+            const btnWho = document.getElementById('btn-draw-who');
+            const btnDrink = document.getElementById('btn-draw-drink');
+            if (disabled) {
+                btnWho.disabled = true;
+                btnWho.classList.add('opacity-50', 'cursor-not-allowed');
+                btnDrink.disabled = true;
+                btnDrink.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btnWho.disabled = false;
+                btnWho.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnDrink.disabled = false;
+                btnDrink.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // ==================== STREAMING_CHUNK:Batch Import Manager... ====================
+        function saveImportedMenus() {
+            const bentoText = document.getElementById('import-bento-input').value.trim();
+            const drinkText = document.getElementById('import-drink-input').value.trim();
+
+            // 解析便當
+            const newBentos = [];
+            bentoText.split('\n').forEach((line, i) => {
+                if (!line.trim()) return;
+                // 分割空白或逗號
+                const parts = line.replace(/,/g, ' ').split(/\s+/);
+                if (parts.length >= 2) {
+                    const price = parseInt(parts[parts.length - 1]);
+                    const name = parts.slice(0, parts.length - 1).join(' ');
+                    if (!isNaN(price)) {
+                        newBentos.push({ id: `b-custom-${i}`, name, price });
+                    }
+                }
+            });
+
+            // 解析飲料
+            const newDrinks = [];
+            drinkText.split('\n').forEach((line, i) => {
+                if (!line.trim()) return;
+                const parts = line.replace(/,/g, ' ').split(/\s+/);
+                if (parts.length >= 2) {
+                    const price = parseInt(parts[parts.length - 1]);
+                    const name = parts.slice(0, parts.length - 1).join(' ');
+                    if (!isNaN(price)) {
+                        newDrinks.push({ id: `d-custom-${i}`, name, price });
+                    }
+                }
+            });
+
+            if (newBentos.length === 0 && newDrinks.length === 0) {
+                showToast("輸入格式錯誤，無法正確解析！", "error");
+                return;
+            }
+
+            if (newBentos.length > 0) state.bentos = newBentos;
+            if (newDrinks.length > 0) state.drinks = newDrinks;
+
+            saveDataToStorage();
+            renderMenus();
+            showToast("成功匯入新配置！選單已更新。");
+            switchTab('tab-order');
+        }
+
+        function restoreDefaultMenus() {
+            if (confirm("是否確定回復為預設的太空食堂便當與飲料選項？")) {
+                state.bentos = [...DEFAULT_BENTOS];
+                state.drinks = [...DEFAULT_DRINKS];
+                state.lotteryNames = [...DEFAULT_LOTTERY_NAMES];
+                saveDataToStorage();
+                renderMenus();
+                initLotteryTab();
+                showToast("已重置回原廠出廠設定！");
+                switchTab('tab-order');
+            }
+        }
+
+        // ==================== STREAMING_CHUNK:App Onload Initialization... ====================
+        window.onload = function () {
+            // 啟動 3D 粒子星空
+            init3DStarfield();
+
+            // 讀取/初始化資料
+            loadDataFromStorage();
+            
+            // 渲染選單
+            renderMenus();
+
+            // 更新購物車
+            updateOrderStats();
+
+            // 初始化抽籤分頁
+            initLotteryTab();
+        }
+    </script>
+</body>
+</html>
